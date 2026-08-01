@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "overwatch-cdp"
+version = "0.1.0"
+description = "Passive web-app assessment by riding a real authenticated session over Chrome DevTools Protocol."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Nicholas Kloster", email = "nicholas@nuclide-research.com" }]
+keywords = ["security", "passive", "web", "cdp", "chrome-devtools", "vdt", "assessment"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+
+# The offline path (scan-har, all detectors, the ledger) has ZERO dependencies.
+# Live watch needs a WebSocket client; keep it an optional extra so the core
+# taxonomy installs bare.
+dependencies = []
+
+[project.optional-dependencies]
+live = ["websocket-client>=1.6"]
+
+[project.scripts]
+overwatch = "overwatch.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/zellkernel/overwatch"
+Source = "https://github.com/zellkernel/overwatch"
+
+[tool.setuptools]
+packages = ["overwatch"]

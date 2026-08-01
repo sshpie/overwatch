@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+
+# Captures — NEVER commit live traffic. HAR/session dumps carry real
+# credentials, cookies, and PII. The redaction layer protects *reports*,
+# not raw captures. Keep captures out of the repo entirely.
+*.har
+*.network-response
+*.network-request
+captures/
+scratch/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
