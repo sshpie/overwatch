@@ -1,69 +1,94 @@
 # Overwatch
 
-**A passive web-application security assessment tool.**
+**A passive tool for testing web applications. It watches. It does not touch.**
 
-Overwatch attaches to a real Chrome browser session via the Chrome DevTools
-Protocol (CDP). You simply log in and click around the target application as a
-normal user. Overwatch silently observes the authentic traffic your
-interactions generate — **no extra requests are sent** — then feeds those
-exchanges into a set of detectors.
+Overwatch joins a real Chrome session over the Chrome DevTools Protocol (CDP).
+You log in. You click around the target like any other user. Overwatch watches
+the traffic you make. It sends nothing of its own. It takes what it sees and
+gives it to the detectors.
 
-In **live mode** it can run alongside Claude Code, which reasons over the
-observed traffic in real time and surfaces security findings such as
-over-privileged entitlements, leaked account identifiers, pre-signed cloud
-URLs, weak JWTs, and other metadata-level issues.
+In live mode it runs beside Claude Code. Claude reads the traffic as it comes
+and says what is wrong. A permission too wide. An account name where it should
+not be. A signed cloud URL that names the signer. A weak token. Small things, on
+the wire, that add up.
 
-Because it never sends a request of its own, from the server's side it is
-indistinguishable from the user — there is no scanner noise, no crafted
-payload, and no new attack surface.
+It never knocks. To the server you are one user and nothing more. No noise. No
+payload. No new door.
 
-> **This is a defensive / authorized-testing tool.** The danger of a passive
-> observer is precisely that it leaves no scanner tripwire — so the scope
-> discipline is self-imposed *before the first byte*. Ride only sessions on
-> applications you own or are explicitly authorized to assess.
+> **This is a tool for work you are allowed to do.** A quiet watcher leaves no
+> mark, so the line is yours to hold. Watch only the sessions you own or are
+> cleared to watch. Hold the scope before the first byte.
 
 ---
 
-## How it works in practice — a session watching over your shoulder
+## How it works
 
-The idea matters more than the plumbing: **you use the app normally, and something reads the traffic and calls out the vulnerabilities as they go by.** There are two ways to run that idea.
+The plumbing is not the point. You use the app. Something reads the traffic and
+names the trouble as it goes past. There are two ways to do it.
 
-**The live way (what the screenshots below show).** You start Chrome or Edge with the debugging port open and log into an app you're authorized to test. A Claude Code session attaches to that browser over the DevTools Protocol (the `chrome-devtools` MCP) and just watches. As you click around — open a page, run a search, ask the built-in AI a question — every request and response the app makes streams past the session, and it reads each one, decodes the JSON, and flags anything wrong: a permission wildcard, your account ID going to a third-party tracker, a pre-signed cloud URL that names its own service account, a token that grants more than it should. **You browse; it finds.** Nothing extra is ever sent to the server, so from the app's side there is only you.
+**The live way.** This is what the pictures show. You open Chrome with the
+debugging port open. You log in. A Claude Code session joins the browser over the
+DevTools Protocol (the `chrome-devtools` MCP) and watches. You open a page. You
+run a search. You ask the built-in AI a question. Every request and every answer
+goes past the session. It reads each one. It opens the JSON. It marks what is
+wrong: a wildcard, your account ID sent to a stranger, a signed URL that names
+its own account, a token that grants too much. You browse. It finds. Nothing
+more goes to the server. From the app's side there is only you.
 
-**The packaged way (the CLI).** The `overwatch` command in this repo is that same loop distilled into a standalone tool — it connects to the same debugging port, watches the same traffic, runs the same detector taxonomy, and prints a deduped, severity-sorted report, no AI session required. Use the live way when you want a smart pair of eyes reasoning about what it sees; use the CLI when you want a repeatable, scriptable pass.
+**The packaged way.** The `overwatch` command is the same loop, alone. It joins
+the same port. It watches the same traffic. It runs the same detectors. It prints
+a clean report, sorted by weight. No AI needed. Use the live way when you want a
+mind on it. Use the command when you want the same pass, again and again.
 
-### A real session, walked through
+### A real session
 
-These four frames are one authorized pass over an **enterprise O'Reilly Learning** account — an ordinary "ask the AI a question, read a book" session, with a Claude session watching. (Live cookies and the operator's account UUID are boxed out in the first frame; that redaction is the tool's own restraint ethic applied to its own screenshots.)
+Four frames. One allowed pass over an **enterprise O'Reilly Learning** account.
+An ordinary session. Ask the AI. Read a book. Claude watches. In the first frame
+the live cookies and the account UUID are boxed out. The tool redacts its own
+pictures the way it redacts its reports.
 
-**1 — Reading traffic the app already made.** The session pulls one response body straight from the browser's DevTools cache (`get_network_request` — no new request is sent) and immediately spots that the AI Answers endpoint lets the *client* supply the RAG retrieval query.
+**1 — Reading what the app already sent.** The session takes one response body
+from the browser cache. It sends no request. It sees at once that the AI Answers
+endpoint lets the client write the search query.
 
 ![Overwatch capturing a response body over CDP and flagging a client-supplied RAG query](docs/img/01-cdp-capture.png)
 
-**2 — Findings, as they surface.** Two Mediums fall out of that one endpoint: the answer response ships the AI agent's full internal reasoning and tool schema (`ask_oreilly_books`, `create_answer_draft`) down to the browser, and the client dictates the raw Solr filter query the search backend trusts.
+**2 — The findings come.** Two mediums fall out of that one endpoint. The answer
+ships the agent's own reasoning and its tool schema (`ask_oreilly_books`,
+`create_answer_draft`) down to the browser. And the client writes the raw Solr
+filter the search trusts.
 
 ![Passive findings: agent chain-of-thought and tool schema leaked to the client, client-dictated RAG query](docs/img/02-answers-ai-findings.png)
 
-**3 — Verify-only discipline, and what was done right.** The entitlement-gate and filter-injection leads are logged as *"surface open, access not exercised"* — confirming them needs a crafted request, which is out of passive scope — and the session also records the controls that were correct, because a finding's absence is itself a finding.
+**3 — Say only what you saw.** The entitlement gate and the filter lead go down
+as *"surface open, access not exercised."* To prove them you would have to send
+something, and that is past the line. The session also writes down what was done
+right. A finding can be an absence.
 
 ![Content-extraction table, verify-only entitlement question, and the positive controls](docs/img/03-entitlement-and-verify-only.png)
 
-**4 — The one that mattered.** The usage-event beacon exposes O'Reilly's royalty-attribution engine: the browser POSTs the per-book payout weights itself (an `attribution_map` summing to 100.00), so financial-attribution inputs are client-controlled. Chain that with the client-controlled search query from frame 2 and you have a royalty-farming path. Logged Critical, verify-only.
+**4 — The one that mattered.** The usage beacon shows the royalty engine. The
+browser posts the payout weights itself, an `attribution_map` that sums to
+100.00. The money inputs come from the client. Join that to the client-written
+search from frame two and you have a way to farm royalties. Logged Critical. Not
+exercised.
 
 ![Critical finding: client-submitted royalty/attribution accounting in the usage-event POST](docs/img/04-critical-royalty-attribution.png)
 
-### Running the live way yourself
+### Do it yourself
 
-1. Start the browser with the debugging port open and log into the app you're authorized to assess:
+1. Open the browser with the port open and log in to an app you are allowed to test:
    ```bash
    google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/ow-profile
    ```
-2. Point a Claude Code session at it — the `chrome-devtools` MCP talks to `http://127.0.0.1:9222` — and tell it plainly: *"watch this session and call out any vulnerabilities as I browse."*
-3. Use the app. The session reads each request/response as it happens and reports findings live. You drive; it watches.
+2. Point a Claude Code session at it. The `chrome-devtools` MCP talks to `http://127.0.0.1:9222`. Tell it plain: *"watch this session and call out any vulnerabilities as I browse."*
+3. Use the app. The session reads each request and each answer as it comes and names the findings. You drive. It watches.
 
 ---
 
 ## Install
+
+The core needs nothing. Live watching needs one more thing.
 
 ```bash
 # core taxonomy + offline HAR scanning — ZERO dependencies
@@ -73,8 +98,8 @@ pip install .
 pip install '.[live]'
 ```
 
-Python ≥ 3.10. The offline path (all detectors, the ledger, `scan-har`) runs
-with only the standard library — handy in a locked-down environment.
+Python 3.10 or better. The offline path runs on the standard library alone.
+Every detector. The ledger. `scan-har`. Good for a locked-down box.
 
 ---
 
@@ -94,7 +119,7 @@ overwatch tabs
 #   8A3F...  O'Reilly — Cassandra Sandbox        https://learning.oreilly.com/...
 ```
 
-### 3. Ride one tab for a bounded window
+### 3. Watch one tab for a while
 
 ```bash
 overwatch watch --tab oreilly --seconds 120
@@ -104,28 +129,27 @@ overwatch watch --tab oreilly --seconds 120
 #   [+] [Low]    GCS pre-signed URL leaks signer identity  — ...
 ```
 
-Then use the app normally for those two minutes. Overwatch reports what rolled
-past, deduped and severity-sorted, with every live credential truncated.
+Now use the app for those two minutes. Overwatch reports what went past. Sorted
+by weight. Deduped. Every live credential cut short.
 
-### 4. Or scan a saved capture offline
+### 4. Or read a saved capture
 
 ```bash
 overwatch scan-har session.har --json
 ```
 
-Runs the identical taxonomy over a HAR export ("Save all as HAR" in DevTools, or
-a proxy dump) — no live browser needed. Good for a capture someone handed you,
-or a session recorded earlier.
+It runs the same detectors on a HAR export. "Save all as HAR" in DevTools, or a
+proxy dump. No browser needed. Good for a capture handed to you, or one made
+earlier.
 
 ---
 
 ## The finding taxonomy
 
-Each tell in traffic routes to the VDT knowledge-base class that explains and
-fixes it. The detectors are deliberately conservative — a tell is a *candidate*,
-and Overwatch says so; **surface open ≠ access exercised**. Confirming an IDOR
-or a wildcard's real reach is a follow-up, done deliberately, not by the passive
-pass.
+Every tell on the wire points to a VDT page that explains it and fixes it. The
+detectors are careful. A tell is a candidate, and Overwatch says so. **Surface
+open is not access exercised.** To prove an IDOR, or how far a wildcard reaches,
+you go back and do it on purpose. The passive pass does not.
 
 | Detector | Tell on the wire | Default severity | VDT class |
 |---|---|---|---|
@@ -140,48 +164,45 @@ pass.
 | `graphql-endpoint` | a `/graphql` path (introspection / over-fetch candidate) | Info | open-api-documentation |
 | `jwt-exposure` | a JWT on the wire — decoded to show `sub` / `perms` / `exp` | Info | access-control |
 
-Adding a detector is one pure function `(Exchange) -> Iterable[Finding]` in
-`overwatch/detectors.py`, appended to `ALL_DETECTORS`. It must never mutate the
-exchange and never emit traffic.
+A detector is one function, `(Exchange) -> Iterable[Finding]`, in
+`overwatch/detectors.py`, added to `ALL_DETECTORS`. It does not change the
+exchange. It does not send traffic.
 
 ---
 
-## The restraint ethic (enforced in code, not just docs)
+## The restraint ethic
 
-- **Passive only.** No detector, no CLI path, ever sends a crafted request. The
-  observer's whole command vocabulary is `Network.enable` + `getResponseBody`.
-- **Truncate live credentials.** Every string that reaches output passes through
-  `overwatch.redact` — JWTs, cloud signatures, bearer tokens, session cookies
-  become recognizable-but-unusable stubs. The report shows the *claim*, never the
-  *secret*.
-- **Names, not exfiltration.** A finding is metadata — a shape, a header, an
-  identifier. An identifier (a service-account email, the operator's own account
-  UUID) is *the finding* and is shown; a credential (the signature that would
-  let you replay) is redacted. Name the infra, redact the key.
-- **Captures never enter the repo.** `.gitignore` blocks `*.har` and
-  `*.network-*`. Redaction protects *reports*; raw captures carry real
-  credentials and stay out entirely.
-- **Scope is the operator's.** The tool can't tell an authorized session from an
-  unauthorized one — only you can. Ride only what you own or are cleared to
-  assess.
+- **Passive only.** No detector and no command ever sends a crafted request. The
+  watcher knows two words: `Network.enable` and `getResponseBody`.
+- **Cut the credentials short.** Every string that reaches the output goes
+  through `overwatch.redact`. JWTs, cloud signatures, bearer tokens, session
+  cookies. All become stubs you can read but not use. The report shows the claim,
+  not the secret.
+- **Names, not theft.** A finding is metadata. A shape. A header. A name. A name
+  is the finding, and you show it — a service-account email, your own account
+  UUID. A credential you hide — the signature that would let you replay. Name the
+  infrastructure. Hide the key.
+- **Captures stay out.** `.gitignore` blocks `*.har` and `*.network-*`. Redaction
+  guards the reports. The raw captures hold real credentials, so they never come
+  in at all.
+- **The scope is yours.** The tool cannot tell an allowed session from one that
+  is not. Only you can. Watch only what you own or are cleared to watch.
 
 ---
 
 ## Proof of concept
 
 [`poc/oreilly-enterprise-session.md`](poc/oreilly-enterprise-session.md) — a real
-run against an authorized, authenticated **enterprise** O'Reilly Learning
-session. One ~normal browsing pass surfaced 13 findings across ~13 microservices,
-all metadata-only, all credentials redacted. It's the case study that produced
-this taxonomy.
+run on an allowed, logged-in **enterprise** O'Reilly Learning session. One
+ordinary pass turned up 13 findings across some 13 services. All metadata. All
+credentials cut short. This is the run that made the taxonomy.
 
 ---
 
 ## Origin
 
-Overwatch began as a method note in the
-[VDT-INFO-LEARN](../VDT-INFO-LEARN/tools/overwatch.md) knowledge base — a
-transferable technique for VDT training. It graduated to its own tool because
-"ride the real session and read what the app already tells you" is a primitive
-worth having on its own, with the restraint ethic baked into the code rather
-than living only in a doc.
+Overwatch started as a note in the
+[VDT-INFO-LEARN](../VDT-INFO-LEARN/tools/overwatch.md) knowledge base. A way of
+working, written down to teach. It became its own tool because the idea is worth
+keeping alone: ride the real session, and read what the app already tells you.
+Now the restraint lives in the code, not only in the note.
