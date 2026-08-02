@@ -22,6 +22,45 @@ over-grant. No scanner noise, no crafted payloads, no new attack surface.
 
 ---
 
+## How it works in practice — a session watching over your shoulder
+
+The idea matters more than the plumbing: **you use the app normally, and something reads the traffic and calls out the vulnerabilities as they go by.** There are two ways to run that idea.
+
+**The live way (what the screenshots below show).** You start Chrome or Edge with the debugging port open and log into an app you're authorized to test. A Claude Code session attaches to that browser over the DevTools Protocol (the `chrome-devtools` MCP) and just watches. As you click around — open a page, run a search, ask the built-in AI a question — every request and response the app makes streams past the session, and it reads each one, decodes the JSON, and flags anything wrong: a permission wildcard, your account ID going to a third-party tracker, a pre-signed cloud URL that names its own service account, a token that grants more than it should. **You browse; it finds.** Nothing extra is ever sent to the server, so from the app's side there is only you.
+
+**The packaged way (the CLI).** The `overwatch` command in this repo is that same loop distilled into a standalone tool — it connects to the same debugging port, watches the same traffic, runs the same detector taxonomy, and prints a deduped, severity-sorted report, no AI session required. Use the live way when you want a smart pair of eyes reasoning about what it sees; use the CLI when you want a repeatable, scriptable pass.
+
+### A real session, walked through
+
+These four frames are one authorized pass over an **enterprise O'Reilly Learning** account — an ordinary "ask the AI a question, read a book" session, with a Claude session watching. (Live cookies and the operator's account UUID are boxed out in the first frame; that redaction is the tool's own restraint ethic applied to its own screenshots.)
+
+**1 — Reading traffic the app already made.** The session pulls one response body straight from the browser's DevTools cache (`get_network_request` — no new request is sent) and immediately spots that the AI Answers endpoint lets the *client* supply the RAG retrieval query.
+
+![Overwatch capturing a response body over CDP and flagging a client-supplied RAG query](docs/img/01-cdp-capture.png)
+
+**2 — Findings, as they surface.** Two Mediums fall out of that one endpoint: the answer response ships the AI agent's full internal reasoning and tool schema (`ask_oreilly_books`, `create_answer_draft`) down to the browser, and the client dictates the raw Solr filter query the search backend trusts.
+
+![Passive findings: agent chain-of-thought and tool schema leaked to the client, client-dictated RAG query](docs/img/02-answers-ai-findings.png)
+
+**3 — Verify-only discipline, and what was done right.** The entitlement-gate and filter-injection leads are logged as *"surface open, access not exercised"* — confirming them needs a crafted request, which is out of passive scope — and the session also records the controls that were correct, because a finding's absence is itself a finding.
+
+![Content-extraction table, verify-only entitlement question, and the positive controls](docs/img/03-entitlement-and-verify-only.png)
+
+**4 — The one that mattered.** The usage-event beacon exposes O'Reilly's royalty-attribution engine: the browser POSTs the per-book payout weights itself (an `attribution_map` summing to 100.00), so financial-attribution inputs are client-controlled. Chain that with the client-controlled search query from frame 2 and you have a royalty-farming path. Logged Critical, verify-only.
+
+![Critical finding: client-submitted royalty/attribution accounting in the usage-event POST](docs/img/04-critical-royalty-attribution.png)
+
+### Running the live way yourself
+
+1. Start the browser with the debugging port open and log into the app you're authorized to assess:
+   ```bash
+   google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/ow-profile
+   ```
+2. Point a Claude Code session at it — the `chrome-devtools` MCP talks to `http://127.0.0.1:9222` — and tell it plainly: *"watch this session and call out any vulnerabilities as I browse."*
+3. Use the app. The session reads each request/response as it happens and reports findings live. You drive; it watches.
+
+---
+
 ## Why passive-first
 
 | | Active scanner (nuclei, ZAP, Burp active) | Overwatch (passive observer) |
