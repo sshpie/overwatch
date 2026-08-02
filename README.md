@@ -1,98 +1,41 @@
-# Overwatch
+**Overwatch** (https://github.com/zellkernel/overwatch) is a passive web-application security assessment tool. It attaches to a real, already-authenticated browser session and analyzes the traffic the user generates—without sending any of its own requests.
 
-**A passive web-application security assessment tool.**
+### Core idea
+A human logs into a target application in Chrome/Edge (or any Chromium browser) and uses it normally. Overwatch rides that session via the Chrome DevTools Protocol (CDP), reads response bodies from the browser’s cache, runs a fixed taxonomy of detectors, and surfaces security-relevant findings (wildcard entitlements, leaked credentials/PII, misconfigurations, etc.). From the server’s perspective it is indistinguishable from ordinary user traffic because it *is* that traffic.
 
-Overwatch watches the traffic a browser already sends and receives, and reports
-security findings from it. It connects to Chrome over the Chrome DevTools
-Protocol (CDP) and **sends no requests of its own** — to the server you look like
-a normal user.
+### Claude Code integration (“live” mode)
+The primary live workflow uses **Claude Code** + the `chrome-devtools` MCP:
 
-You log in, use the app, and Overwatch reads each request and response and runs a
-set of detectors over it. In **live mode** it runs alongside Claude Code, which
-reasons over the traffic and calls out findings as you browse.
+1. Launch the browser with remote debugging enabled:
+   ```bash
+   google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/ow-profile
+   ```
+2. Log in and browse the authorized target.
+3. Point a Claude Code session at the debugging port (`http://127.0.0.1:9222`) and instruct it to watch the session and call out vulnerabilities as you browse.
 
-> Authorized testing only. It leaves no scanner trace, so scope is on you. Watch
-> only apps you own or are cleared to test.
+Claude Code observes the real authenticated traffic in real time and reports findings. No extra requests are ever issued.
 
-## Install
+### Packaged CLI mode (no AI required)
+The same detector logic is available as a standalone `overwatch` command that connects to the same debugging port, captures exchanges, runs the detectors, deduplicates, severity-sorts, redacts sensitive data, and outputs a report (text or JSON). It also supports offline analysis of HAR files.
 
-```bash
-pip install .          # core + offline HAR scanning, zero dependencies
-pip install '.[live]'  # add live watch (needs a WebSocket client)
-```
+### Key technical points
+- **Zero outbound requests** of its own — pure observation via CDP (`Network.enable` + `Network.getResponseBody` on `loadingFinished` events).
+- Detectors are pure functions over request/response “Exchange” objects (examples: wildcard entitlements, AI reasoning/tool-schema leaks, PII to third parties, wildcard CORS, JWT exposure, IDOR-style UUIDs in paths, etc.).
+- Automatic redaction of credentials, JWTs, cookies, etc.
+- Findings are treated as *candidates*, not confirmed exploits.
+- Core (HAR scanning) needs only the Python standard library; live mode adds a WebSocket client.
 
-Python 3.10+. The offline path uses only the standard library.
+### Ethical / practical constraints emphasized in the repo
+- Scope is strictly user-defined and limited to applications the operator is authorized to assess.
+- No active probing, no crafted payloads, no risk of write/delete/DoS side-effects.
+- Credentials are redacted in all outputs.
 
-## Use
+In short, Overwatch turns a normal authenticated browser session (driven by a human, optionally observed/analyzed by Claude Code) into a passive “security dashcam.” It is not an active scanner or autonomous pentester; it only reports what the real application traffic already reveals.
 
-```bash
-# 1. start Chrome with the debugging port, then log in
-google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/ow-profile
-
-# 2. list tabs
-overwatch tabs
-
-# 3. watch one tab for a bounded window (passive only)
-overwatch watch --tab oreilly --seconds 120
-#   [+] [High]   Wildcard entitlement in `privileges`
-#   [+] [Medium] Real account identifier(s) sent to analytics.google.com
-#   [+] [Low]    GCS pre-signed URL leaks signer identity
-
-# 4. or scan a saved capture offline
-overwatch scan-har session.har --json
-```
-
-For live mode, point a Claude Code session at `http://127.0.0.1:9222` (the
-`chrome-devtools` MCP) and tell it: *"watch this session and call out any
-vulnerabilities as I browse."*
-
-## What it looks like
-
-Four frames from one authorized session on an enterprise O'Reilly Learning
-account. Credentials and the account UUID are boxed out in the first frame.
+### Screenshots
+One authorized session on an enterprise O'Reilly Learning account. Credentials and the account UUID are boxed out in the first frame.
 
 ![Capturing a response body over CDP](docs/img/01-cdp-capture.png)
 ![Findings surfaced from the AI Answers endpoint](docs/img/02-answers-ai-findings.png)
 ![Verify-only discipline and the positive controls](docs/img/03-entitlement-and-verify-only.png)
 ![Critical: client-controlled royalty attribution](docs/img/04-critical-royalty-attribution.png)
-
-## Detectors
-
-Each finding is a candidate — **surface open ≠ access exercised**. Confirming one
-means sending a request deliberately, which the passive pass never does.
-
-| Detector | Tell on the wire | Severity |
-|---|---|---|
-| `wildcard-entitlement` | a scope value with a `*` (`"privileges":"sview:*"`) | High |
-| `ai-reasoning-leak` | `"reasoning"` / `"tool_schema"` in a response | Medium |
-| `pii-to-third-party` | real account/org UUID in an analytics beacon | Medium / Low |
-| `wildcard-cors` | `Access-Control-Allow-Origin: *` (+creds → Medium) | Medium / Low |
-| `presigned-url-infra` | `X-Goog-Credential` / `X-Amz-Credential` names the signer | Low |
-| `idor-uuid-in-path` | an object UUID/id as an `/api/...` path segment | Low |
-| `public-client-token` | a `pub...` client token in a URL | Low |
-| `version-banner` | `Server:` version or a service codename | Info |
-| `graphql-endpoint` | a `/graphql` path | Info |
-| `jwt-exposure` | a JWT on the wire, decoded to `sub` / `perms` / `exp` | Info |
-
-Add one by writing a `(Exchange) -> Iterable[Finding]` function in
-`overwatch/detectors.py`. It must not modify the exchange or send traffic.
-
-## Restraint
-
-- **Passive only.** The only CDP commands used are `Network.enable` and
-  `getResponseBody`.
-- **Credentials truncated.** Every output string passes through
-  `overwatch.redact`; JWTs, signatures, tokens, and cookies become unusable
-  stubs. The report shows the finding, not the secret.
-- **Names, not exfiltration.** Identifiers (a service-account email, your own
-  account UUID) are the finding and are shown; the credential that would let you
-  replay is redacted.
-- **Captures stay out.** `.gitignore` blocks `*.har` and `*.network-*`.
-
-## More
-
-- [`poc/oreilly-enterprise-session.md`](poc/oreilly-enterprise-session.md) — the
-  real run that produced this taxonomy: 13 findings, all metadata, all
-  credentials redacted.
-- [VDT-INFO-LEARN](../VDT-INFO-LEARN/tools/overwatch.md) — where the method
-  started.
