@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "overwatch-cdp"
 version = "0.1.0"
-description = "Passive web-app assessment by riding a real authenticated session over Chrome DevTools Protocol."
+description = "A passive web-application security assessment tool — attaches to a real Chrome session over the DevTools Protocol and surfaces findings from the traffic you already generate."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

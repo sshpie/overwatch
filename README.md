@@ -1,19 +1,21 @@
 # Overwatch
 
-**Passive web-application assessment by riding a real authenticated session.**
+**A passive web-application security assessment tool.**
 
-A human drives a real logged-in browser. Overwatch attaches to Chrome's
-DevTools Protocol (CDP), watches the traffic the app *already* generates, and
-runs a finding taxonomy over it. It emits **zero requests of its own** — from
-the server's side it is indistinguishable from the user, because it *is* the
-user's traffic.
+Overwatch attaches to a real Chrome browser session via the Chrome DevTools
+Protocol (CDP). You simply log in and click around the target application as a
+normal user. Overwatch silently observes the authentic traffic your
+interactions generate — **no extra requests are sent** — then feeds those
+exchanges into a set of detectors.
 
-Think of it as a **dashcam for a security engineer**: you go about your normal
-authenticated workday inside an app you're authorized to assess, and Overwatch
-records the security-relevant tells as they roll past — wildcard entitlements in
-a session response, a real account UUID shipped to a third-party analytics
-endpoint, a pre-signed cloud URL that names its signer, a JWT whose claims
-over-grant. No scanner noise, no crafted payloads, no new attack surface.
+In **live mode** it can run alongside Claude Code, which reasons over the
+observed traffic in real time and surfaces security findings such as
+over-privileged entitlements, leaked account identifiers, pre-signed cloud
+URLs, weak JWTs, and other metadata-level issues.
+
+Because it never sends a request of its own, from the server's side it is
+indistinguishable from the user — there is no scanner noise, no crafted
+payload, and no new attack surface.
 
 > **This is a defensive / authorized-testing tool.** The danger of a passive
 > observer is precisely that it leaves no scanner tripwire — so the scope
