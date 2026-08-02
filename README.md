@@ -63,54 +63,6 @@ These four frames are one authorized pass over an **enterprise O'Reilly Learning
 
 ---
 
-## Why passive-first
-
-| | Active scanner (nuclei, ZAP, Burp active) | Overwatch (passive observer) |
-|---|---|---|
-| Traffic it emits | Thousands of crafted requests | **Zero** — reads the browser's own cache |
-| Detectable | Trivially (WAF, rate-limit, anomaly) | No — identical to a real user |
-| Auth state | Has to be scripted / replayed, often breaks | The human's real, current session |
-| What it sees | Whatever it knows to ask for | **Exactly what the app actually does** in real use |
-| Risk of damage | Can write, delete, DoS | Cannot — it never sends anything |
-
-The trade is coverage-for-safety: a passive observer only sees endpoints the
-human actually exercises. So Overwatch is not a replacement for an active scan —
-it's the pass you run *first*, on a session you're already in, that surfaces the
-findings an active scan would either miss (because it never authenticated as
-this user) or be too loud to reach.
-
----
-
-## Architecture
-
-```
-   ┌─ human ─────────────┐        ┌─ Overwatch ────────────────────────────┐
-   │  Chrome, logged in   │        │                                        │
-   │  --remote-debugging  │◀──CDP──│  CDPObserver                           │
-   │  -port=9222          │  :9222 │   Network.enable                       │
-   │                      │        │   on loadingFinished:                  │
-   │  clicks, navigates,  │        │     Network.getResponseBody  ──► Exchange
-   │  uses the app        │        │                                   │    │
-   └──────────┬───────────┘        │                                   ▼    │
-              │                    │   run_detectors(Exchange) ──► [Finding]│
-              ▼                    │                                   │    │
-      real app traffic            │   Ledger  (dedupe, severity-sort) │    │
-      (the ONLY traffic)          │   redact() every value ──────────►│    │
-                                  │                                   ▼    │
-                                  │            report (text | JSON)        │
-                                  └────────────────────────────────────────┘
-```
-
-**Key CDP fact the design turns on:** response bodies **evict on navigation**.
-DevTools only holds a body between `loadingFinished` and the next page load, so
-Overwatch reacts to the `loadingFinished` event and reads the body *then* — not
-on a poll. Miss that window and the body is gone.
-
-Every command Overwatch issues (`Network.enable`, `Network.getResponseBody`) is
-a **read against the browser's own memory**, never a request to the target app.
-
----
-
 ## Install
 
 ```bash
