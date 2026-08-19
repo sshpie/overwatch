@@ -32,8 +32,8 @@ live = ["websocket-client>=1.6"]
 overwatch = "overwatch.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/zellkernel/overwatch"
-Source = "https://github.com/zellkernel/overwatch"
+Homepage = "https://github.com/sshpie/overwatch"
+Source = "https://github.com/sshpie/overwatch"
 
 [tool.setuptools]
 packages = ["overwatch"]

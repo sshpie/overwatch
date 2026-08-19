@@ -1,4 +1,4 @@
-**Overwatch** (https://github.com/zellkernel/overwatch) is a passive web-application security assessment tool. It attaches to a real, already-authenticated browser session and analyzes the traffic the user generates—without sending any of its own requests.
+**Overwatch** (https://github.com/sshpie/overwatch) is a passive web-application security assessment tool. It attaches to a real, already-authenticated browser session and analyzes the traffic the user generates—without sending any of its own requests.
 
 ### Core idea
 A human logs into a target application in Chrome/Edge (or any Chromium browser) and uses it normally. Overwatch rides that session via the Chrome DevTools Protocol (CDP), reads response bodies from the browser’s cache, runs a fixed taxonomy of detectors, and surfaces security-relevant findings (wildcard entitlements, leaked credentials/PII, misconfigurations, etc.). From the server’s perspective it is indistinguishable from ordinary user traffic because it *is* that traffic.
