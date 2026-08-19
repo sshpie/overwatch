@@ -9,7 +9,7 @@ description = "A passive web-application security assessment tool — attaches t
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "Nicholas Kloster", email = "nicholas@nuclide-research.com" }]
+authors = [{ name = "", email = "" }]
 keywords = ["security", "passive", "web", "cdp", "chrome-devtools", "vdt", "assessment"]
 classifiers = [
     "Development Status :: 3 - Alpha",
